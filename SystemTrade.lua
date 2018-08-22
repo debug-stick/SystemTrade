@@ -20,6 +20,7 @@ end
 function OnPlayerOpenTradeWindow( args,a_Player )
 	local window = cLuaWindows(cWindow.wtChest,9,6,"Trade Windows")
 	window:Setslot(a_Player, 0, cItem(E_ITEM_DIAMOND, 1))
+	--window:SetOnClicked(MyOnWindowClicked)
 	a_Player:OpenWindow(window)
 end
 
@@ -38,5 +39,13 @@ function MyOnPlayerRightClick(Player, BlockX, BlockY, BlockZ, BlockFace, CursorX
 		return false
 	end
 	LOG("player clicked " .. a_BlockX .. "," .. a_BlockY .. "," .. a_BlockZ)
+	return true
+end
+
+function MyOnWindowClicked(a_Window, a_Player, a_SlotNum, a_ClickAction, a_ClickedItem)
+	if (not (a_Window:GetWindowType() == cWindow.wtChest and a_Window:GetWindowTitle() == "Trade Windows")) then
+		return false
+	end
+	LOG("player clicked slot " .. a_SlotNum)
 	return true
 end
