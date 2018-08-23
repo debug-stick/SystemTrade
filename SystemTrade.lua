@@ -37,7 +37,7 @@ function OnPlayerOpenTradeWindow(args, a_Player)
 	end
 	window:SetOnClicked(MyOnWindowClicked)
 	a_Player:OpenWindow(window)
-	return false
+	return true
 end
 
 function MyOnWindowClicked(a_Window, a_Player, a_SlotNum, a_ClickAction, a_ClickedItem)
