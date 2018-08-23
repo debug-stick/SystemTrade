@@ -84,7 +84,7 @@ function BuyItemFormSystem(a_Player, a_Item)
 					a_Player:SendMessage("your inventory is full")
 				end
 			else
-				a_Player:SendMessage(string.format("you don't have enough money!\nthis will cost:%d$\nyour balance is:%d$",price,money))
+				a_Player:SendMessage(string.format("you don't have enough money!\nthis will cost:%d$\nyour balance is:%d$",SaleList[i][2],money))
 			end
 			return true
 		end
