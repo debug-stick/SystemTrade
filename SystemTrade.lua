@@ -5,7 +5,7 @@ function Initialize(a_Plugin)
 	a_Plugin:SetName("SystemTrade")
 	a_Plugin:SetVersion(3)
 	g_Plugin = a_Plugin
-	cPluginManager.BindCommand("/systrade", "SystemTrade.Trade", OnPlayerOpenTradeWindow, " - open system trade window")
+	cPluginManager.BindCommand("/systrade", "SystemTrade.Trade", OnPlayerOpenTradeWindow, " <buy|sale> - open system trade window")
 	LOG("SystemTrade v".. g_Plugin:GetVersion() .. " is loaded")
 	return true
 end
@@ -14,17 +14,111 @@ function OnDisable()
 	LOG("SystemTrade v" .. g_Plugin:GetVersion() .. " is disabling")
 end
 
-function OnPlayerOpenTradeWindow( args,a_Player )
-	local window = cLuaWindow(cWindow.wtChest,9,6,"Trade Windows")
-	window:SetSlot(a_Player, 0, cItem(E_ITEM_DIAMOND, 1))
+function OnPlayerOpenTradeWindow(args, a_Player)
+	if(#args == 1) then
+		a_Player:SendMessage("with param <buy|sale> to open special window")
+		return false
+	end
+	local window = nil
+	if(args[2] == "buy") then 
+		window = cLuaWindow(cWindow.wtChest,9,(#SaleList + 8) / 9,"#Trade Windows:Sale#\nright click item to show detail")
+		for i=1,#SaleList do
+			window:SetSlot(a_Player,i - 1, cItem(SaleList[i][1]))
+		end
+	end
+	if(args[2] == "sale") then
+		window = cLuaWindow(cWindow.wtChest,9,(#BuyList + 8) / 9,"#Trade Windows:Bought#\nright click item to show detail")
+		for i=1,#BuyList do
+			window:SetSlot(a_Player,i - 1, cItem(BuyList[i][1]))
+		end
+	end
 	window:SetOnClicked(MyOnWindowClicked)
 	a_Player:OpenWindow(window)
 end
 
 function MyOnWindowClicked(a_Window, a_Player, a_SlotNum, a_ClickAction, a_ClickedItem)
-	if (not (a_Window:GetWindowType() == cWindow.wtChest and a_Window:GetWindowTitle() == "Trade Windows")) then
+	if (string.find(a_Window:GetWindowTitle(), "Trade Windows") == nil) then
 		return false
 	end
-	LOG("player clicked slot " .. a_SlotNum)
+	if(a_ClickedItem == nil) then 
+		return true
+	end
+	--buy block from system
+	if(a_ClickAction == caLeftClick) then
+		if(string.find(a_Window:GetWindowTitle(), "Sale") ~= nil) then 
+			BuyItemFormSystem(a_Player,a_ClickedItem)
+		end
+		if(string.find(a_Window:GetWindowTitle(), "Bought") ~= nil) then
+			SaleItemToSystem(a_Player,a_ClickedItem)
+		end
+	end
+	--sale block to system
+	if(a_ClickAction == caRightClick) then
+		ShowGoodsDetail(a_Player,a_ClickedItem)
+	end
 	return true
+end
+
+
+function BuyItemFormSystem(a_Player, a_Item)
+	local money = Balance(a_Player:GetUUID())
+	for i=1,#SaleList do
+		if(SaleList[i][1] == a_Item.m_ItemType) then
+			if(money >= SaleList[i][2]) then
+				local a_Inventory = a_Player:GetInventory()
+				local n_Item = cItem(a_Item.m_ItemType,1)
+				if(a_Inventory:AddItem(n_Item) == 1) then
+					Credit(a_Player:GetUUID(),money - SaleList[i][2])
+					a_Player:SendMessage(string.format("you have spended:%d$your balance is:%d$",SaleList[i][2],money - SaleList[i][2]))
+				else
+					a_Player:SendMessage("your inventory is full")
+				end
+			else
+				a_Player:SendMessage(string.format("you don't have enough money!\nthis will cost:%d$\nyour balance is:%d$",price,money))
+			end
+			return
+		end
+	end
+end
+
+function SaleItemToSystem(a_Player, a_Item)
+	local money = Balance(a_Player:GetUUID())
+	local a_Inventory = a_Player:GetInventory()
+	for i=0,#BuyList do
+		if(BuyList[i][1] == a_Item.m_ItemType) then
+			local count = a_Inventory:RemoveItem(cItem(a_Item.m_ItemType,BuyList[i][3]))
+			if(count > 1) then
+				local pay = BuyList[i][2] * count / BuyList[i][3]
+				Credit(a_Player, money + pay)
+				a_Player:SendMessage(string.format("you have sold %d items\nyou have get:%d$your balance is:%d$",count,pay,money + pay))
+			else
+				a_Player:SendMessage("you don't have such item!")
+			end
+		end
+	end
+end
+
+function ShowGoodsDetail(a_Player, a_Item)
+	InSale = false
+	for i=1,#SaleList do
+		if(SaleList[i][1] == a_Item.m_ItemType) then 
+			a_Player:SendMessage(string.format("This item is sale with price:%d$",SaleList[i][2]))
+			InSale = true
+			break
+		end
+	end
+	if(InSale == false) then 
+		a_Player:SendMessage("This item is not on sale")
+	end
+	InBuy = false
+	for i=1,#BuyList do
+		if(BuyList[i][1] == a_Item.m_ItemType) then
+			a_Player:SendMessage(string.format("This item being bought with price:%d$/%d",BuyList[i][2],BuyList[i][3]))
+			InBuy = true
+			break
+		end
+	end
+	if(InBuy == false) then
+		a_Player:SendMessage("This item can not be bought")
+	end
 end
