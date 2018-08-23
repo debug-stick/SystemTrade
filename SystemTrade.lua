@@ -7,6 +7,9 @@ function Initialize(a_Plugin)
 	g_Plugin = a_Plugin
 	cPluginManager.BindCommand("/systrade", "SystemTrade.Trade", OnPlayerOpenTradeWindow, " <buy|sale> - open system trade window")
 	LOG("SystemTrade v".. g_Plugin:GetVersion() .. " is loaded")
+	if(cPluginManager:CallPlugin("Coin","Balance","BANK") == nil) then
+		LOG("please load Coin plugin first before SystemTrade")
+	end
 	return true
 end
 
@@ -21,19 +24,20 @@ function OnPlayerOpenTradeWindow(args, a_Player)
 	end
 	local window = nil
 	if(args[2] == "buy") then 
-		window = cLuaWindow(cWindow.wtChest,9,(#SaleList + 8) / 9,"#Trade Windows:Sale#\nright click item to show detail")
+		window = cLuaWindow(cWindow.wtChest,9,(#SaleList + 8) / 9,"Trade Windows:Sale")
 		for i=1,#SaleList do
 			window:SetSlot(a_Player,i - 1, cItem(SaleList[i][1]))
 		end
 	end
 	if(args[2] == "sale") then
-		window = cLuaWindow(cWindow.wtChest,9,(#BuyList + 8) / 9,"#Trade Windows:Bought#\nright click item to show detail")
+		window = cLuaWindow(cWindow.wtChest,9,(#BuyList + 8) / 9,"Trade Windows:Bought")
 		for i=1,#BuyList do
 			window:SetSlot(a_Player,i - 1, cItem(BuyList[i][1]))
 		end
 	end
 	window:SetOnClicked(MyOnWindowClicked)
 	a_Player:OpenWindow(window)
+	return false
 end
 
 function MyOnWindowClicked(a_Window, a_Player, a_SlotNum, a_ClickAction, a_ClickedItem)
@@ -43,13 +47,19 @@ function MyOnWindowClicked(a_Window, a_Player, a_SlotNum, a_ClickAction, a_Click
 	if(a_ClickedItem == nil) then 
 		return true
 	end
-	--buy block from system
+	--trade block with system
 	if(a_ClickAction == caLeftClick) then
+		--buy
 		if(string.find(a_Window:GetWindowTitle(), "Sale") ~= nil) then 
-			BuyItemFormSystem(a_Player,a_ClickedItem)
+			if(BuyItemFormSystem(a_Player,a_ClickedItem) == false) then
+				a_Player:SendMessage("this item can not trade!")
+			end
 		end
+		--sale
 		if(string.find(a_Window:GetWindowTitle(), "Bought") ~= nil) then
-			SaleItemToSystem(a_Player,a_ClickedItem)
+			if(SaleItemToSystem(a_Player,a_ClickedItem) == false) then
+				a_Player:SendMessage("this item can not trade!")
+			end
 		end
 	end
 	--sale block to system
@@ -61,41 +71,44 @@ end
 
 
 function BuyItemFormSystem(a_Player, a_Item)
-	local money = Balance(a_Player:GetUUID())
+	local money = tonumber(string.match(cPluginManager:CallPlugin("Coin","Balance",a_Player:GetUUID()),"%d+"))
 	for i=1,#SaleList do
 		if(SaleList[i][1] == a_Item.m_ItemType) then
 			if(money >= SaleList[i][2]) then
 				local a_Inventory = a_Player:GetInventory()
 				local n_Item = cItem(a_Item.m_ItemType,1)
 				if(a_Inventory:AddItem(n_Item) == 1) then
-					Credit(a_Player:GetUUID(),money - SaleList[i][2])
-					a_Player:SendMessage(string.format("you have spended:%d$your balance is:%d$",SaleList[i][2],money - SaleList[i][2]))
+					cPluginManager:CallPlugin("Coin","Debit", a_Player:GetUUID(), SaleList[i][2])
+					a_Player:SendMessage(string.format("you have cost:%d$\nyour balance is:%d$",SaleList[i][2],money - SaleList[i][2]))
 				else
 					a_Player:SendMessage("your inventory is full")
 				end
 			else
 				a_Player:SendMessage(string.format("you don't have enough money!\nthis will cost:%d$\nyour balance is:%d$",price,money))
 			end
-			return
+			return true
 		end
 	end
+	return false
 end
 
 function SaleItemToSystem(a_Player, a_Item)
-	local money = Balance(a_Player:GetUUID())
+	local money = tonumber(string.match(cPluginManager:CallPlugin("Coin","Balance",a_Player:GetUUID()),"%d+"))
 	local a_Inventory = a_Player:GetInventory()
-	for i=0,#BuyList do
+	for i=1,#BuyList do
 		if(BuyList[i][1] == a_Item.m_ItemType) then
 			local count = a_Inventory:RemoveItem(cItem(a_Item.m_ItemType,BuyList[i][3]))
 			if(count > 1) then
 				local pay = BuyList[i][2] * count / BuyList[i][3]
-				Credit(a_Player, money + pay)
-				a_Player:SendMessage(string.format("you have sold %d items\nyou have get:%d$your balance is:%d$",count,pay,money + pay))
+				cPluginManager:CallPlugin("Coin", "Credit", a_Player:GetUUID(), pay)
+				a_Player:SendMessage(string.format("you have sold %d items\nyou have get:%d$\nyour balance is:%d$",count,pay,money + pay))
 			else
 				a_Player:SendMessage("you don't have such item!")
 			end
+			return true
 		end
 	end
+	return false
 end
 
 function ShowGoodsDetail(a_Player, a_Item)
