@@ -17,6 +17,10 @@ SaleList =
 	{E_BLOCK_ICE,10,1},
 	{E_BLOCK_CLAY,10,1},
 	{E_ITEM_WATER_BUCKET,30,1}
+	{E_ITEM_MELON_SLICE,30,1},
+	{E_BLOCK_PUMPKIN,50,1},
+	{E_ITEM_CARROT,20,1},
+	{E_ITEM_POTATO,20,1},
 }
 --players can sale items in the list
 BuyList=
